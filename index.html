@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Maps Scraper v5-debug</title>
+    <title>Google Maps Scraper</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -51,21 +51,21 @@
         .status-failed { background: #7f1d1d; color: #fca5a5; }
         .status-pending { background: #3b2f0a; color: #facc15; }
         .empty-state { text-align: center; padding: 40px; color: #52525b; }
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal { background: #18181b; border: 1px solid #27272a; border-radius: 12px; width: 90vw; max-width: 1200px; height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #27272a; }
-        .modal-header h3 { font-size: 16px; }
-        .modal-close { background: none; border: none; color: #71717a; font-size: 24px; cursor: pointer; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal { background: #18181b; border: 1px solid #3f3f46; border-radius: 12px; width: 90vw; max-width: 1200px; height: 80vh; display: flex; flex-direction: column; overflow: hidden; margin: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #3f3f46; }
+        .modal-header h3 { font-size: 16px; color: #e4e4e7; }
+        .modal-close { background: none; border: none; color: #a1a1aa; font-size: 24px; cursor: pointer; }
         .modal-close:hover { color: #e4e4e7; }
         .modal-body { padding: 20px; overflow: auto; flex: 1; min-height: 0; }
         .results-filter { margin-bottom: 12px; display: flex; gap: 12px; align-items: center; }
         .results-filter input { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; color: #e4e4e7; font-size: 14px; flex: 1; }
         .results-filter input:focus { outline: none; border-color: #3b82f6; }
         .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .results-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #27272a; color: #71717a; font-weight: 600; position: sticky; top: 0; background: #18181b; }
-        .results-table td { padding: 6px 10px; border-bottom: 1px solid #1c1c1f; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .results-table tr:hover td { background: #1c1c1f; }
-        .results-table a { color: #60a5fa; text-decoration: none; }
+        .results-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #3f3f46; color: #a1a1aa; font-weight: 600; position: sticky; top: 0; background: #18181b; }
+        .results-table td { padding: 8px 12px; border-bottom: 1px solid #27272a; color: #e4e4e7; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .results-table tr:hover td { background: #27272a; }
+        .results-table a { color: #93c5fd; text-decoration: none; }
         .results-table a:hover { text-decoration: underline; }
         .toast { position: fixed; bottom: 20px; right: 20px; background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 12px 20px; z-index: 2000; font-size: 14px; animation: slideIn 0.3s ease; }
         .toast.success { border-color: #166534; }
@@ -343,23 +343,17 @@
         document.getElementById('resultsModal').style.display = 'flex';
         try {
             const url = `${apiUrl}/api/v1/jobs/${id}/download`;
-            console.log('Buscando resultados:', url);
             const res = await fetch(url);
-            console.log('Status:', res.status, 'Content-Type:', res.headers.get('content-type'));
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const text = await res.text();
-            console.log('Resposta recebida:', text.length, 'caracteres');
-            console.log('Primeiros 300 chars:', text.substring(0, 300));
             if (!text || !text.trim()) {
                 document.getElementById('resultsContent').innerHTML = '<div class="empty-state">Nenhum resultado encontrado</div>';
                 return;
             }
             const rows = parseCsv(text);
-            console.log('Linhas parseadas:', rows.length);
             allResults = rows;
             renderResults(rows);
         } catch (e) {
-            console.error('Erro ao carregar resultados:', e);
             document.getElementById('resultsContent').innerHTML = `<div class="empty-state">Erro ao carregar: ${e.message}</div>`;
         }
     }
