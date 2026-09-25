@@ -344,32 +344,78 @@
         document.getElementById('resultsFilter').value = '';
         try {
             const res = await fetch(`${apiUrl}/api/v1/jobs/${id}/download`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const text = await res.text();
+            if (!text || !text.trim()) {
+                document.getElementById('resultsContent').innerHTML = '<div class="empty-state">Nenhum resultado encontrado</div>';
+                return;
+            }
             const rows = parseCsv(text);
             allResults = rows;
             renderResults(rows);
         } catch (e) {
-            document.getElementById('resultsContent').innerHTML = '<div class="empty-state">Erro ao carregar resultados</div>';
+            console.error('Erro ao carregar resultados:', e);
+            document.getElementById('resultsContent').innerHTML = `<div class="empty-state">Erro ao carregar: ${e.message}</div>`;
         }
     }
 
+    function parseCsvLine(line) {
+        const vals = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (inQuotes) {
+                if (c === '"') {
+                    if (i + 1 < line.length && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    current += c;
+                }
+            } else {
+                if (c === '"') {
+                    inQuotes = true;
+                } else if (c === ',') {
+                    vals.push(current);
+                    current = '';
+                } else {
+                    current += c;
+                }
+            }
+        }
+        vals.push(current);
+        return vals;
+    }
+
     function parseCsv(text) {
-        const lines = text.split('\n').filter(l => l.trim());
+        const lines = [];
+        let current = '';
+        for (const line of text.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (current) {
+                current += '\n' + trimmed;
+            } else {
+                current = trimmed;
+            }
+            const quotes = (current.match(/"/g) || []).length;
+            if (quotes % 2 === 0) {
+                lines.push(current);
+                current = '';
+            }
+        }
+        if (current) lines.push(current);
         if (lines.length < 2) return [];
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        const headers = parseCsvLine(lines[0]).map(h => h.trim());
         const rows = [];
         for (let i = 1; i < lines.length; i++) {
-            const vals = [];
-            let current = '';
-            let inQuotes = false;
-            for (const char of lines[i]) {
-                if (char === '"') { inQuotes = !inQuotes; }
-                else if (char === ',' && !inQuotes) { vals.push(current.trim()); current = ''; }
-                else { current += char; }
-            }
-            vals.push(current.trim());
+            const vals = parseCsvLine(lines[i]);
             const row = {};
-            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').replace(/^"|"$/g, ''); });
+            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
             rows.push(row);
         }
         return rows;
@@ -381,7 +427,11 @@
             container.innerHTML = '<div class="empty-state">Nenhum resultado encontrado</div>';
             return;
         }
-        const cols = Object.keys(rows[0]);
+        const preferred = ['title', 'phone', 'emails', 'website', 'category', 'address', 'review_rating', 'review_count', 'latitude', 'longitude'];
+        const allCols = Object.keys(rows[0]);
+        const cols = preferred.filter(c => allCols.includes(c));
+        if (!cols.length) cols.push(...allCols.slice(0, 10));
+
         let html = '<table class="results-table"><thead><tr>';
         cols.forEach(c => { html += `<th>${c}</th>`; });
         html += '</tr></thead><tbody>';
@@ -389,12 +439,10 @@
             html += '<tr>';
             cols.forEach(c => {
                 let val = row[c] || '';
-                if (c === 'website' || c === 'url' || c === 'link') {
-                    if (val && val.startsWith('http')) {
-                        val = `<a href="${val}" target="_blank" title="${val}">${val.replace(/^https?:\/\//, '').substring(0, 30)}...</a>`;
-                    }
+                if ((c === 'website' || c === 'url' || c === 'link') && val.startsWith('http')) {
+                    val = `<a href="${val}" target="_blank">${val.replace(/^https?:\/\//, '').substring(0, 35)}...</a>`;
                 } else {
-                    val = `<span title="${val}">${val.substring(0, 50)}${val.length > 50 ? '...' : ''}</span>`;
+                    val = `<span title="${val}">${val.substring(0, 60)}${val.length > 60 ? '...' : ''}</span>`;
                 }
                 html += `<td>${val}</td>`;
             });
