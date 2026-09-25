@@ -2,8 +2,9 @@ services:
   google-maps-scraper:
     build: .
     restart: unless-stopped
+    command: ["-web", "-data-folder", "/gmapsdata"]
     ports:
-      - "8090:8080"
+      - "8080:8080"
     volumes:
       - gmaps_data:/gmapsdata
       - gmaps_cache:/opt
