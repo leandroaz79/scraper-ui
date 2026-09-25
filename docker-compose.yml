@@ -3,7 +3,6 @@ services:
     build: .
     restart: unless-stopped
     container_name: scraper-web-ui
-    command: ["-web", "-data-folder", "/gmapsdata"]
     ports:
       - "8090:8080"
     volumes:
