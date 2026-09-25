@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Scraper</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e4e4e7; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header h1 span { color: #3b82f6; }
+        .header .api-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .api-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .api-dot.connected { background: #22c55e; }
+        .main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .config-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 12px 16px; }
+        .config-bar input { flex: 1; background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; color: #e4e4e7; font-size: 14px; }
+        .config-bar input:focus { outline: none; border-color: #3b82f6; }
+        .config-bar button { background: #3b82f6; color: white; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        .config-bar button:hover { background: #2563eb; }
+        #map { height: 350px; border-radius: 8px; border: 1px solid #27272a; margin-bottom: 16px; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .panel { background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 20px; }
+        .panel h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; color: #e4e4e7; font-size: 14px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #3b82f6; }
+        .form-group textarea { resize: vertical; min-height: 60px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .coords-display { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #71717a; margin-bottom: 14px; font-family: monospace; }
+        .coords-display.has-coords { color: #22c55e; border-color: #166534; }
+        .btn { border: none; border-radius: 6px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { background: #1e3a5f; color: #5b7a9d; cursor: not-allowed; }
+        .btn-danger { background: #7f1d1d; color: #fca5a5; font-size: 12px; padding: 4px 10px; }
+        .btn-danger:hover { background: #991b1b; }
+        .btn-success { background: #166534; color: #bbf7d0; font-size: 12px; padding: 4px 10px; }
+        .btn-success:hover { background: #15803d; }
+        .btn-sm { width: auto; padding: 4px 10px; font-size: 12px; }
+        .jobs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .jobs-table th { text-align: left; padding: 8px; border-bottom: 1px solid #27272a; color: #71717a; font-weight: 500; }
+        .jobs-table td { padding: 8px; border-bottom: 1px solid #1c1c1f; }
+        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-working { background: #1e3a5f; color: #60a5fa; }
+        .status-ok { background: #14532d; color: #4ade80; }
+        .status-failed { background: #7f1d1d; color: #fca5a5; }
+        .status-pending { background: #3b2f0a; color: #facc15; }
+        .empty-state { text-align: center; padding: 40px; color: #52525b; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #18181b; border: 1px solid #27272a; border-radius: 12px; width: 90vw; max-width: 1200px; max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #27272a; }
+        .modal-header h3 { font-size: 16px; }
+        .modal-close { background: none; border: none; color: #71717a; font-size: 24px; cursor: pointer; }
+        .modal-close:hover { color: #e4e4e7; }
+        .modal-body { padding: 20px; overflow: auto; flex: 1; }
+        .results-filter { margin-bottom: 12px; display: flex; gap: 12px; align-items: center; }
+        .results-filter input { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; color: #e4e4e7; font-size: 14px; flex: 1; }
+        .results-filter input:focus { outline: none; border-color: #3b82f6; }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .results-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #27272a; color: #71717a; font-weight: 600; position: sticky; top: 0; background: #18181b; }
+        .results-table td { padding: 6px 10px; border-bottom: 1px solid #1c1c1f; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .results-table tr:hover td { background: #1c1c1f; }
+        .results-table a { color: #60a5fa; text-decoration: none; }
+        .results-table a:hover { text-decoration: underline; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 12px 20px; z-index: 2000; font-size: 14px; animation: slideIn 0.3s ease; }
+        .toast.success { border-color: #166534; }
+        .toast.error { border-color: #7f1d1d; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .search-location { display: flex; gap: 8px; margin-bottom: 12px; }
+        .search-location input { flex: 1; background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 8px 12px; color: #e4e4e7; font-size: 14px; }
+        .search-location input:focus { outline: none; border-color: #3b82f6; }
+        .search-location button { background: #27272a; color: #e4e4e7; border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+        .search-location button:hover { background: #3f3f46; }
+        @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>&#x1F5FA;</span> Google Maps Scraper</h1>
+    <div class="api-status">
+        <div class="api-dot" id="apiDot"></div>
+        <span id="apiStatusText">Desconectado</span>
+    </div>
+</div>
+
+<div class="main">
+    <div class="config-bar">
+        <input type="text" id="apiUrl" placeholder="URL da API (deixe vazio se usar o mesmo domínio)" />
+        <button onclick="saveApiUrl()">Conectar</button>
+    </div>
+
+    <div class="search-location">
+        <input type="text" id="locationSearch" placeholder="Buscar cidade ou endereço (ex: Bangu, Rio de Janeiro)" onkeydown="if(event.key==='Enter')searchLocation()" />
+        <button onclick="searchLocation()">Buscar</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="layout">
+        <div class="panel">
+            <h2>&#x26A1; Novo Scraping</h2>
+            <div class="coords-display" id="coordsDisplay">Clique no mapa para selecionar a localização</div>
+            <div class="form-group">
+                <label>Palavra-chave</label>
+                <textarea id="keyword" rows="3" placeholder="Ex: Fisioterapia em Bangu, Rio de Janeiro&#10;Restaurantes em Copacabana&#10;Odontologia em Brasília"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Profundidade (depth)</label>
+                    <input type="number" id="depth" value="5" min="1" max="10" />
+                </div>
+                <div class="form-group">
+                    <label>Tempo máximo</label>
+                    <select id="maxTime">
+                        <option value="180">3 minutos</option>
+                        <option value="300" selected>5 minutos</option>
+                        <option value="600">10 minutos</option>
+                        <option value="900">15 minutos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Zoom</label>
+                    <input type="number" id="zoom" value="15" min="1" max="21" />
+                </div>
+                <div class="form-group">
+                    <label>Raio (metros)</label>
+                    <input type="number" id="radius" value="10000" min="100" max="50000" step="100" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="emailCheck" /> Extrair emails</label>
+            </div>
+            <button class="btn btn-primary" id="scrapeBtn" onclick="createJob()">Iniciar Scraping</button>
+        </div>
+
+        <div class="panel">
+            <h2>&#x1F4CB; Jobs</h2>
+            <div id="jobsList">
+                <div class="empty-state">Nenhum job encontrado</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="resultsModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="resultsTitle">Resultados</h3>
+            <button class="modal-close" onclick="closeResults()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="results-filter">
+                <input type="text" id="resultsFilter" placeholder="Filtrar resultados..." oninput="filterResults()" />
+                <button class="btn btn-success btn-sm" onclick="downloadCsv()">Baixar CSV</button>
+            </div>
+            <div id="resultsContent">
+                <div class="empty-state">Carregando...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var map, marker;
+    var apiUrl = localStorage.getItem('scraper_api_url') || window.location.origin;
+    var allResults = [];
+
+    // Init map
+    map = L.map('map').setView([-22.9, -43.2], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
+
+    map.on('click', function(e) {
+        setMarker(e.latlng.lat, e.latlng.lng);
+    });
+
+    function setMarker(lat, lng) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+        marker.bindPopup(`Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+        document.getElementById('coordsDisplay').textContent = `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
+        document.getElementById('coordsDisplay').classList.add('has-coords');
+        document.getElementById('zoom').value = map.getZoom();
+    }
+
+    async function searchLocation() {
+        const q = document.getElementById('locationSearch').value.trim();
+        if (!q) return;
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.length > 0) {
+                const { lat, lon } = data[0];
+                map.setView([parseFloat(lat), parseFloat(lon)], 15);
+                setMarker(parseFloat(lat), parseFloat(lon));
+            } else {
+                showToast('Local não encontrado', 'error');
+            }
+        } catch (e) {
+            showToast('Erro ao buscar local', 'error');
+        }
+    }
+
+    function saveApiUrl() {
+        apiUrl = document.getElementById('apiUrl').value.replace(/\/+$/, '').trim();
+        if (!apiUrl) apiUrl = window.location.origin;
+        localStorage.setItem('scraper_api_url', apiUrl);
+        testConnection();
+    }
+
+    async function testConnection() {
+        try {
+            const res = await fetch(`${apiUrl}/api/v1/jobs`);
+            if (res.ok) {
+                document.getElementById('apiDot').classList.add('connected');
+                document.getElementById('apiStatusText').textContent = 'Conectado';
+                showToast('Conectado à API!', 'success');
+                loadJobs();
+            } else { throw new Error(); }
+        } catch (e) {
+            document.getElementById('apiDot').classList.remove('connected');
+            document.getElementById('apiStatusText').textContent = 'Erro de conexão';
+            showToast('Falha ao conectar. Verifique a URL.', 'error');
+        }
+    }
+
+    async function createJob() {
+        const lat = marker ? marker.getLatLng().lat : null;
+        const lng = marker ? marker.getLatLng().lng : null;
+        if (!lat || !lng) { showToast('Selecione uma localização no mapa', 'error'); return; }
+
+        const keyword = document.getElementById('keyword').value.trim();
+        if (!keyword) { showToast('Digite uma palavra-chave', 'error'); return; }
+
+        if (!apiUrl) { showToast('Configure a URL da API primeiro', 'error'); return; }
+
+        const keywords = keyword.split('\n').map(k => k.trim()).filter(k => k);
+        const btn = document.getElementById('scrapeBtn');
+        btn.disabled = true;
+        btn.textContent = 'Criando job...';
+
+        try {
+            const res = await fetch(`${apiUrl}/api/v1/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: keywords[0].substring(0, 40),
+                    keywords: keywords,
+                    lang: 'pt',
+                    zoom: parseInt(document.getElementById('zoom').value),
+                    lat: String(lat),
+                    lon: String(lng),
+                    depth: parseInt(document.getElementById('depth').value),
+                    max_time: parseInt(document.getElementById('maxTime').value),
+                    email: document.getElementById('emailCheck').checked,
+                    fast_mode: false,
+                    radius: parseInt(document.getElementById('radius').value)
+                })
+            });
+            const data = await res.json();
+            if (data.id) {
+                showToast(`Job criado: ${data.id.substring(0, 8)}...`, 'success');
+                document.getElementById('keyword').value = '';
+                loadJobs();
+            } else {
+                showToast(data.message || 'Erro ao criar job', 'error');
+            }
+        } catch (e) {
+            showToast('Erro ao conectar com a API', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Iniciar Scraping';
+        }
+    }
+
+    async function loadJobs() {
+        if (!apiUrl) return;
+        try {
+            const res = await fetch(`${apiUrl}/api/v1/jobs`);
+            if (!res.ok) return;
+            const jobs = await res.json();
+            renderJobs(jobs);
+
+            const hasWorking = jobs.some(j => j.Status === 'working' || j.Status === 'pending');
+            if (hasWorking) {
+                setTimeout(loadJobs, 5000);
+            }
+        } catch (e) {}
+    }
+
+    function renderJobs(jobs) {
+        const container = document.getElementById('jobsList');
+        if (!jobs.length) {
+            container.innerHTML = '<div class="empty-state">Nenhum job encontrado</div>';
+            return;
+        }
+        jobs.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+        let html = '<table class="jobs-table"><thead><tr><th>Nome</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody>';
+        jobs.forEach(job => {
+            const date = new Date(job.Date).toLocaleString('pt-BR');
+            const name = job.Name || job.ID.substring(0, 8);
+            const statusClass = `status-${job.Status}`;
+            const statusLabel = { working: 'Processando', ok: 'Concluído', failed: 'Falhou', pending: 'Aguardando' }[job.Status] || job.Status;
+            let actions = '';
+            if (job.Status === 'ok') {
+                actions += `<button class="btn btn-success btn-sm" onclick="viewResults('${job.ID}','${name}')">Ver Resultados</button> `;
+                actions += `<button class="btn btn-sm" style="background:#1e3a5f;color:#60a5fa" onclick="downloadJob('${job.ID}','${name}')">CSV</button> `;
+            }
+            actions += `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.ID}')">Deletar</button>`;
+            html += `<tr><td title="${job.ID}">${name}</td><td><span class="status-badge ${statusClass}">${statusLabel}</span></td><td>${date}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    async function deleteJob(id) {
+        if (!confirm('Deletar este job?')) return;
+        try {
+            await fetch(`${apiUrl}/api/v1/jobs/${id}`, { method: 'DELETE' });
+            showToast('Job deletado', 'success');
+            loadJobs();
+        } catch (e) {
+            showToast('Erro ao deletar', 'error');
+        }
+    }
+
+    async function viewResults(id, name) {
+        document.getElementById('resultsTitle').textContent = `Resultados: ${name}`;
+        document.getElementById('resultsModal').classList.add('active');
+        document.getElementById('resultsContent').innerHTML = '<div class="empty-state">Carregando...</div>';
+        document.getElementById('resultsFilter').value = '';
+        try {
+            const res = await fetch(`${apiUrl}/api/v1/jobs/${id}/download`);
+            const text = await res.text();
+            const rows = parseCsv(text);
+            allResults = rows;
+            renderResults(rows);
+        } catch (e) {
+            document.getElementById('resultsContent').innerHTML = '<div class="empty-state">Erro ao carregar resultados</div>';
+        }
+    }
+
+    function parseCsv(text) {
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) return [];
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const vals = [];
+            let current = '';
+            let inQuotes = false;
+            for (const char of lines[i]) {
+                if (char === '"') { inQuotes = !inQuotes; }
+                else if (char === ',' && !inQuotes) { vals.push(current.trim()); current = ''; }
+                else { current += char; }
+            }
+            vals.push(current.trim());
+            const row = {};
+            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').replace(/^"|"$/g, ''); });
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    function renderResults(rows) {
+        const container = document.getElementById('resultsContent');
+        if (!rows.length) {
+            container.innerHTML = '<div class="empty-state">Nenhum resultado encontrado</div>';
+            return;
+        }
+        const cols = Object.keys(rows[0]);
+        let html = '<table class="results-table"><thead><tr>';
+        cols.forEach(c => { html += `<th>${c}</th>`; });
+        html += '</tr></thead><tbody>';
+        rows.forEach(row => {
+            html += '<tr>';
+            cols.forEach(c => {
+                let val = row[c] || '';
+                if (c === 'website' || c === 'url' || c === 'link') {
+                    if (val && val.startsWith('http')) {
+                        val = `<a href="${val}" target="_blank" title="${val}">${val.replace(/^https?:\/\//, '').substring(0, 30)}...</a>`;
+                    }
+                } else {
+                    val = `<span title="${val}">${val.substring(0, 50)}${val.length > 50 ? '...' : ''}</span>`;
+                }
+                html += `<td>${val}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function filterResults() {
+        const q = document.getElementById('resultsFilter').value.toLowerCase();
+        if (!q) { renderResults(allResults); return; }
+        const filtered = allResults.filter(row => Object.values(row).some(v => String(v).toLowerCase().includes(q)));
+        renderResults(filtered);
+    }
+
+    function downloadCsv() {
+        if (!allResults.length) return;
+        const cols = Object.keys(allResults[0]);
+        let csv = cols.join(',') + '\n';
+        allResults.forEach(row => {
+            csv += cols.map(c => `"${(row[c] || '').replace(/"/g, '""')}"`).join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scrape-results-${Date.now()}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function downloadJob(id, name) {
+        try {
+            const res = await fetch(`${apiUrl}/api/v1/jobs/${id}/download`);
+            const text = await res.text();
+            const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${name.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            showToast('Erro ao baixar CSV', 'error');
+        }
+    }
+
+    function closeResults() {
+        document.getElementById('resultsModal').classList.remove('active');
+        allResults = [];
+    }
+
+    document.getElementById('resultsModal').addEventListener('click', function(e) {
+        if (e.target === this) closeResults();
+    });
+
+    function showToast(msg, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type || ''}`;
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Init
+    document.getElementById('apiUrl').value = apiUrl;
+    if (apiUrl) testConnection();
+</script>
+
+</body>
+</html>
