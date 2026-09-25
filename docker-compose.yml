@@ -1,7 +1,6 @@
 services:
   google-maps-scraper:
     build: .
-    container_name: gmaps-scraper
     restart: unless-stopped
     ports:
       - "8080:8080"
