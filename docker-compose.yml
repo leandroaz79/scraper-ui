@@ -1,14 +1,15 @@
 services:
-  google-maps-scraper:
+  scraper-ui:
     build: .
     restart: unless-stopped
+    container_name: scraper-web-ui
     command: ["-web", "-data-folder", "/gmapsdata"]
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
-      - gmaps_data:/gmapsdata
-      - gmaps_cache:/opt
+      - scraper_data:/gmapsdata
+      - scraper_cache:/opt
 
 volumes:
-  gmaps_data:
-  gmaps_cache:
+  scraper_data:
+  scraper_cache:
